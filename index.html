@@ -1,6 +1,31 @@
+<style>
+  div {
+    display: inline-flex;
+    flex-direction: column;
+    margin-right: 170px;
+    align-items: center;
+    
+  }
+  @keyframes transport{
+    from {left: 50px;}
+    to {left: 250px;}
+  }
+  .truck{
+    position: absolute;
+    top: 50px;
+    left: 50px;
+  }
+  .truck[transport]{
+    animation-name: transport;
+    animation-duration: 3s;
+  }
+</style>
 <div>
   <image src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/stone.png" />
+  <p id='mineral'></p>
 </div>
 <div>
   <image src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/repository.png" />
+  <p id='repository'></p>
 </div>
+<image class='truck' src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/truck.png" />
