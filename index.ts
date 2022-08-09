@@ -46,10 +46,11 @@ class Mineral {
 
   digging(): void {
     setInterval(() => {
-      this.stock += Math.ceil(Math.random() * 10);
+      const quantity = Math.ceil(Math.random() * 10);
+      this.stock += quantity
       if (this.stock > this.maxStock) this.stock = this.maxStock;
       this.element.innerHTML = this.stock.toString();
-      this.stockChange$.notifyObservers(this.stock);
+      this.stockChange$.notifyObservers({quantity, type: 'in'});
     }, 2000);
   }
 
@@ -60,6 +61,7 @@ class Mineral {
       } else {
         this.stock -= quantity;
         this.element.innerHTML = this.stock.toString();
+        this.stockChange$.notifyObservers({quantity, type: 'out'});
         resolve(Array(quantity).fill('gold'));
       }
     });
@@ -110,10 +112,14 @@ let repository = new Repository(document.querySelector('#repository'));
 mineral.digging();
 
 mineral.stockChange$.subscribe((stones) => {
-  console.log(truck.isReady, stones);
   if (truck.isReady)
     mineral
       .stockOut(10)
       .then((stones) => truck.transport(stones))
       .then((stones) => repository.stockIn(stones));
+});
+
+let log = document.querySelector('#log');
+mineral.stockChange$.subscribe(message => {
+  log.innerHTML = `<p>${message.type} ${message.quantity}</p>` + log.innerHTML;
 });
