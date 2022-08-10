@@ -40,19 +40,19 @@ console.log(
   )
 );
 
-const priceDiscount10Calcuate = calculate(
+const shoesPriceCalcuate = calculate(
   totalPriceCurrying(0),
   discountCurrying(10)
 );
 
-const priceDiscount20Calcuate = calculate(
+const clothesPriceCalcuate = calculate(
   totalPriceCurrying(0),
   discountCurrying(20)
 );
 
 console.log(
   totalPriceCalculate(
-    priceDiscount10Calcuate(...shoesPrices),
-    priceDiscount20Calcuate(...clothesPrices)
+    shoesPriceCalcuate(...shoesPrices),
+    clothesPriceCalcuate(...clothesPrices)
   )
 );
