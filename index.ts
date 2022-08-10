@@ -1,71 +1,58 @@
-class Mineral {
-  private readonly maxStock: number = 50;
-  private stock: number = 0;
+/**
+ *
+ */
+const shoesPrices = [100, 80];
+const totalPrice = (...prices) => prices.reduce((pre, cur) => pre + cur, 0);
+const discount = (price, off) => price * ((100 - off) / 100);
+console.log(discount(totalPrice(...shoesPrices), 10));
 
-  constructor(private element: Element) {
-    this.element = element;
-  }
+const totalPriceCurrying =
+  (startPrice) =>
+  (...prices) =>
+    startPrice + totalPrice(...prices);
+const discountCurrying = (off) => (price) => discount(price, off);
+const calculate =
+  (...formula) =>
+  (...prices) =>
+    formula.reduce(
+      (prices, formulaFn) =>
+        formulaFn(...(Array.isArray(prices) ? prices : [prices])),
+      prices
+    );
 
-  digging(): void {
-    setInterval(() => {
-      const quantity = Math.ceil(Math.random() * 10);
-      this.stock += quantity;
-      if (this.stock > this.maxStock) this.stock = this.maxStock;
-      this.element.innerHTML = this.stock.toString();
-    }, 2000);
-  }
+const totalPriceCalculate = calculate(
+  totalPriceCurrying(0),
+  discountCurrying(10)
+);
 
-  stockOut(quantity: number): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      if (this.stock < quantity) {
-        reject();
-      } else {
-        this.stock -= quantity;
-        this.element.innerHTML = this.stock.toString();
-        resolve(Array(quantity).fill('gold'));
-      }
-    });
-  }
-}
+console.log(totalPriceCalculate(...shoesPrices));
 
-class Truck {
-  private duration = 3000;
-  private ready = true;
+const clothesPrices = [1000, 800];
+// different discount shoe 10, cloth 20 off
+// total discount 10 off
+console.log(
+  discount(
+    totalPrice(
+      discount(totalPrice(...shoesPrices), 10),
+      discount(totalPrice(...clothesPrices), 20)
+    ),
+    10
+  )
+);
 
-  constructor(private element: Element) {
-    this.element = element;
-  }
+const priceDiscount10Calcuate = calculate(
+  totalPriceCurrying(0),
+  discountCurrying(10)
+);
 
-  get isReady(): boolean {
-    return this.ready;
-  }
+const priceDiscount20Calcuate = calculate(
+  totalPriceCurrying(0),
+  discountCurrying(20)
+);
 
-  transport(stones: string[]): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      this.ready = false;
-      this.element.setAttribute('transport', '');
-      setTimeout(() => {
-        this.ready = true;
-        this.element.removeAttribute('transport');
-        resolve(stones);
-      }, this.duration);
-    });
-  }
-}
-
-class Repository {
-  private stock: number = 0;
-
-  constructor(private element: Element) {
-    this.element = element;
-  }
-
-  stockIn(stones: string[]): void {
-    this.stock += stones.length;
-    this.element.innerHTML = this.stock.toString();
-  }
-}
-
-let mineral = new Mineral(document.querySelector('#mineral'));
-let truck = new Truck(document.querySelector('.truck'));
-let repository = new Repository(document.querySelector('#repository'));
+console.log(
+  totalPriceCalculate(
+    priceDiscount10Calcuate(...shoesPrices),
+    priceDiscount20Calcuate(...clothesPrices)
+  )
+);
