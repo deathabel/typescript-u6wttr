@@ -47,10 +47,10 @@ class Mineral {
   digging(): void {
     setInterval(() => {
       const quantity = Math.ceil(Math.random() * 10);
-      this.stock += quantity
+      this.stock += quantity;
       if (this.stock > this.maxStock) this.stock = this.maxStock;
       this.element.innerHTML = this.stock.toString();
-      this.stockChange$.notifyObservers({quantity, type: 'in'});
+      this.stockChange$.notifyObservers({ quantity, type: 'in' });
     }, 2000);
   }
 
@@ -61,7 +61,7 @@ class Mineral {
       } else {
         this.stock -= quantity;
         this.element.innerHTML = this.stock.toString();
-        this.stockChange$.notifyObservers({quantity, type: 'out'});
+        this.stockChange$.notifyObservers({ quantity, type: 'out' });
         resolve(Array(quantity).fill('gold'));
       }
     });
@@ -102,6 +102,7 @@ class Repository {
 
   stockIn(stones: string[]): void {
     this.stock += stones.length;
+    this.element.innerHTML = this.stock.toString();
   }
 }
 
@@ -120,6 +121,6 @@ mineral.stockChange$.subscribe((stones) => {
 });
 
 let log = document.querySelector('#log');
-mineral.stockChange$.subscribe(message => {
+mineral.stockChange$.subscribe((message) => {
   log.innerHTML = `<p>${message.type} ${message.quantity}</p>` + log.innerHTML;
 });
