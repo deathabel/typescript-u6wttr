@@ -1,71 +1,157 @@
-class Mineral {
-  private readonly maxStock: number = 50;
-  private stock: number = 0;
+import { BehaviorSubject, EMPTY, merge, Observable, of, Subject } from 'rxjs';
+import { connect, filter, map, min, switchMap, tap } from 'rxjs/operators';
 
-  constructor(private element: Element) {
-    this.element = element;
+type changeStockCommand = { type: 'in' | 'out'; quantity: number };
+type stockChanged = { type: 'in' | 'out'; quantity: number; total: number };
+
+class Mineral {
+  private readonly _repository: Repository = new Repository(50);
+
+  constructor() {}
+
+  get stockChanged$(): Observable<stockChanged> {
+    return this._repository.stockChanged$;
   }
 
   digging(): void {
     setInterval(() => {
       const quantity = Math.ceil(Math.random() * 10);
-      this.stock += quantity;
-      if (this.stock > this.maxStock) this.stock = this.maxStock;
-      this.element.innerHTML = this.stock.toString();
-    }, 2000);
+      this._repository.stockIn(this._foundGold(quantity));
+    }, 1000);
   }
 
-  stockOut(quantity: number): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      if (this.stock < quantity) {
-        reject();
-      } else {
-        this.stock -= quantity;
-        this.element.innerHTML = this.stock.toString();
-        resolve(Array(quantity).fill('gold'));
-      }
-    });
+  getGold$(quantity: number): Observable<string[]> {
+    if (this._repository.stock < quantity) return EMPTY;
+    const gold = this._foundGold(quantity);
+    this._repository.stockOut(gold);
+    return of(gold);
+  }
+  private _foundGold(quantity: number) {
+    return Array(quantity).fill('gold');
   }
 }
 
-class Truck {
-  private duration = 3000;
-  private ready = true;
+type truckState = { status: 'ready' | 'onway' | 'arrived'; cargo?: any };
 
-  constructor(private element: Element) {
-    this.element = element;
+class Truck {
+  private _duration = 2000;
+  private _state: truckState = { status: 'ready' };
+  private _changeState$: Subject<truckState> = new Subject();
+  state$: Observable<truckState>;
+
+  constructor() {
+    this.state$ = this._changeState$.pipe(
+      map((state) => (this._state = state))
+    );
   }
 
   get isReady(): boolean {
-    return this.ready;
+    return this._state.status === 'ready';
   }
 
-  transport(stones: string[]): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      this.ready = false;
-      this.element.setAttribute('transport', '');
-      setTimeout(() => {
-        this.ready = true;
-        this.element.removeAttribute('transport');
-        resolve(stones);
-      }, this.duration);
-    });
+  transport$(stones: string[]): Observable<string[]> {
+    if (!this.isReady) return EMPTY;
+    this._changeState$.next({ status: 'onway', cargo: stones });
+    setTimeout(() => {
+      this._changeState$.next({ status: 'arrived', cargo: stones });
+      setTimeout(
+        () => this._changeState$.next({ status: 'ready', cargo: stones }),
+        500
+      );
+    }, this._duration);
+    return this.state$.pipe(
+      filter((truck) => truck.status === 'arrived'),
+      map((truck) => truck.cargo)
+    );
   }
 }
 
 class Repository {
-  private stock: number = 0;
+  private _stock: number = 0;
+  private _changeStock$: BehaviorSubject<changeStockCommand> =
+    new BehaviorSubject({ type: 'in', quantity: this._stock });
+  stockChanged$: Observable<stockChanged>;
 
-  constructor(private element: Element) {
-    this.element = element;
+  constructor(private _maxStock: number) {
+    this._maxStock = _maxStock;
+    this.stockChanged$ = this._changeStock$.pipe(
+      map((command) => ({ ...command, total: this._stock }))
+    );
+    this._changeStock$.subscribe(this._changeStock.bind(this));
+  }
+
+  get stock(): number {
+    return this._stock;
   }
 
   stockIn(stones: string[]): void {
-    this.stock += stones.length;
-    this.element.innerHTML = this.stock.toString();
+    this._changeStock$.next({ type: 'in', quantity: stones.length });
+  }
+
+  stockOut(stones: string[]): void {
+    this._changeStock$.next({ type: 'out', quantity: stones.length });
+  }
+
+  private _changeStock(command: changeStockCommand): number {
+    this._stock += command.quantity * (command.type === 'in' ? 1 : -1);
+    return this._stock > this._maxStock
+      ? (this._stock = this._maxStock)
+      : this._stock;
   }
 }
 
-let mineral = new Mineral(document.querySelector('#mineral'));
-let truck = new Truck(document.querySelector('.truck'));
-let repository = new Repository(document.querySelector('#repository'));
+let mineral = new Mineral();
+let truck = new Truck();
+let repository = new Repository(999);
+
+// render element
+mineral.stockChanged$.subscribe((stock) => {
+  document.querySelector('#mineral').innerHTML = stock.total.toString();
+});
+
+truck.state$
+  .pipe(
+    connect(($shared) =>
+      merge(
+        $shared.pipe(
+          filter((t) => t?.status === 'onway'),
+          tap((t) =>
+            document.querySelector('.truck').setAttribute('transport', '')
+          )
+        ),
+        $shared.pipe(
+          filter((t) => t?.status === 'arrived'),
+          tap((t) =>
+            document.querySelector('.truck').removeAttribute('transport')
+          )
+        )
+      )
+    )
+  )
+  .subscribe();
+
+repository.stockChanged$.subscribe((stock) => {
+  document.querySelector('#repository').innerHTML = stock.total.toString();
+});
+
+// mineral event
+mineral.stockChanged$
+  .pipe(
+    filter(
+      (stock) => stock.type === 'in' && stock.total >= 10 && truck.isReady
+    ),
+    switchMap(() => mineral.getGold$(10)),
+    switchMap((stones) => truck.transport$(stones))
+  )
+  .subscribe();
+
+// transport event
+truck.state$
+  .pipe(
+    filter((t) => t?.status === 'arrived'),
+    tap((t) => repository.stockIn(t.cargo))
+  )
+  .subscribe();
+
+// start digging
+mineral.digging();
