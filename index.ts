@@ -69,3 +69,7 @@ class Repository {
 let mineral = new Mineral(document.querySelector('#mineral'));
 let truck = new Truck(document.querySelector('.truck'));
 let repository = new Repository(document.querySelector('#repository'));
+
+// mineral.digging();
+// truck.transport();
+// repository.stockIn;
