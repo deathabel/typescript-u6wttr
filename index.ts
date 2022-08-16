@@ -1,4 +1,5 @@
 import { from } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 function request(method, url) {
   return from(
@@ -52,7 +53,12 @@ request(
 */
 
 function orderByAreaChanged(event) {
-  console.log(this.value);
+  request(
+    'get',
+    'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
+  )
+    .pipe(map((data) => data.sort((m) => m.area)))
+    .subscribe(renderGrid);
 }
 
 function siteSearchInputChanged(event) {
