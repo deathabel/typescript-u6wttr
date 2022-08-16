@@ -1,32 +1,43 @@
 <style>
-  div {
-    display: inline-flex;
-    flex-direction: column;
-    margin-right: 170px;
-    align-items: center;
-    
+  .grid-title {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 25%);
+    padding: 2px 0px;
+    background-color: $second-color;
+    border-bottom: 2px dotted;
   }
-  @keyframes transport{
-    from {left: 50px;}
-    to {left: 250px;}
+
+  .grid-title > .grid-cell {
+    font-weight: bold;
   }
-  .truck{
-    position: absolute;
-    top: 50px;
-    left: 50px;
+
+  .grid-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 25%);
   }
-  .truck[transport]{
-    animation-name: transport;
-    animation-duration: 3s;
+
+  .grid-cell {
+    padding: 4px;
+
+    button {
+      margin-left: 3px;
+    }
   }
 </style>
 <div>
-  <image src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/stone.png" />
-  <p id='mineral'></p>
-  <p id='log'></p>
+  <input type="text" />
 </div>
-<div>
-  <image src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/repository.png" />
-  <p id='repository'></p>
+<div class="grid">
+  <div class="grid-title">
+    <div class="grid-cell">{{statistic_yyy}}</div>
+    <div class="grid-cell">{{site_id}}</div>
+    <div class="grid-cell">{{area}}</div>
+    <div class="grid-cell">{{population_density}}</div>
+  </div>
+  <div class="grid-row">
+    <div class="grid-cell">{{statistic_yyy}}</div>
+    <div class="grid-cell">{{site_id}}</div>
+    <div class="grid-cell">{{area}}</div>
+    <div class="grid-cell">{{population_density}}</div>
+  </div>
 </div>
-<image class='truck' src="https://raw.githubusercontent.com/deathabel/typescript-u6wttr/main/truck.png" />
