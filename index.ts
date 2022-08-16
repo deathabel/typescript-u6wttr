@@ -31,7 +31,7 @@ function renderGrid(data: any) {
   const contentElement = gridElement.querySelector('.grid-row');
   let contentHtml = contentElement.innerHTML;
   let contentTemplate = '';
-  for (let i = 1; i < data.length; i++) {
+  for (let i = 0; i < data.length; i++) {
     let templateHtml = contentHtml;
     for (const col in data[i]) {
       templateHtml = templateHtml.replace(
@@ -49,11 +49,11 @@ request(
   'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
 ).subscribe(renderGrid);
 
-function siteSearchInputChanged (event){
-  console.log(this.value)
+function siteSearchInputChanged(event) {
+  console.log(this.value);
 }
 
-
-
-
-(document.querySelector('#searchInput') as HTMLInputElement).addEventListener('keyup', siteSearchInputChanged);
+(document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
+  'keyup',
+  siteSearchInputChanged
+);
