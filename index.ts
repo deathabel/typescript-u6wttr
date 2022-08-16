@@ -1,4 +1,5 @@
 import {
+  BehaviorSubject,
   distinctUntilChanged,
   filter,
   from,
@@ -7,19 +8,19 @@ import {
   Subject,
   switchMap,
 } from 'rxjs';
-import { map, debounceTime } from 'rxjs/operators';
+import { map, debounceTime, tap } from 'rxjs/operators';
 
 type dataType = {
   site_id: string;
   area: string;
-  population_density: string;
+  population_density: number;
 };
 
 type conditionType = {
   keyword?: string;
   orderSeq?: number;
   operator?: string;
-  oprand?: string;
+  operand?: number;
 } | null;
 
 function request(method, url): Observable<any> {
@@ -73,6 +74,9 @@ function getData(): Observable<dataType[]> {
 }
 function filterSize(operator: string) {
   return function (a, b): boolean {
+    a = parseInt(a);
+    b = parseInt(b);
+    if (a === NaN || b === NaN) return false;
     switch (operator) {
       case '>=':
         return a >= b;
@@ -89,12 +93,22 @@ function filterSize(operator: string) {
     }
   };
 }
+/**
+ * Try
+ */
+
+// 使用 currying 技巧，將filter和Sort條件先設定好，後續交由其他程序執行
 function filterAndSortData(
   condition: conditionType
 ): (data: dataType[]) => dataType[] {
+  // data filter function
   const filterFn = (item: dataType) =>
     (!condition?.keyword || item.site_id.includes(condition.keyword)) &&
-    filterSize(condition?.operator)(item.population_density, condition?.oprand);
+    filterSize(condition?.operator)(
+      item.population_density,
+      condition?.operand
+    );
+  // return function
   return (data) =>
     data
       .filter(filterFn)
@@ -106,15 +120,19 @@ function filterAndSortData(
           : 0
       );
 }
-let gridSubject = new Subject<conditionType>();
+//let gridSubject = new Subject<conditionType>();
+let gridSubject = new BehaviorSubject<conditionType>({});
 let grid$ = gridSubject.pipe(
   debounceTime(300),
-  distinctUntilChanged(),
+  tap(console.log),
   switchMap((condition) => getData().pipe(map(filterAndSortData(condition))))
 );
 
 grid$.subscribe(renderGrid);
-gridSubject.next(null);
+// normal subject
+// gridSubject.next(null);
+// behavior subject
+// console.log(gridSubject.value)
 
 function orderByAreaChanged(event) {
   const orderSeq = this.value === 'asc' ? 1 : -1;
@@ -139,11 +157,17 @@ function siteSearchInputChanged(event) {
 }
 
 function filterPopulationSelectChanged(event) {
-  console.log(this.value);
+  //console.log(this.value);
+  const command = gridSubject?.value;
+  command.operator = this.value;
+  gridSubject.next(command);
 }
 
 function filterPopulationInputChanged(event) {
-  console.log(this.value);
+  //console.log(this.value);
+  const command = gridSubject.value;
+  command.operand = this.value;
+  gridSubject.next(command);
 }
 
 (document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
