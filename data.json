@@ -1,12 +1,5 @@
 [
   {
-    "statistic_yyy": "統計年",
-    "site_id": "區域別",
-    "people_total": "年底人口數",
-    "area": "土地面積",
-    "population_density": "人口密度"
-  },
-  {
     "statistic_yyy": "109",
     "site_id": "新北市板橋區",
     "people_total": "557114",

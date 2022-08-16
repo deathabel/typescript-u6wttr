@@ -1,7 +1,7 @@
 <style>
   .grid-title {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 25%);
+    grid-template-columns: repeat(auto-fill, 33%);
     padding: 2px 0px;
     background-color: $second-color;
     border-bottom: 2px dotted;
@@ -13,7 +13,7 @@
 
   .grid-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 25%);
+    grid-template-columns: repeat(auto-fill, 33%);
   }
 
   .grid-cell {
@@ -24,18 +24,45 @@
     }
   }
 </style>
-<div>
-  <input type="text" />
-</div>
 <div class="grid">
   <div class="grid-title">
-    <div class="grid-cell">{{statistic_yyy}}</div>
-    <div class="grid-cell">{{site_id}}</div>
-    <div class="grid-cell">{{area}}</div>
-    <div class="grid-cell">{{population_density}}</div>
+    <div class="grid-cell">
+      地區
+      <div>
+        <input type="text" id="searchInput" placeholder="keyin to search" />
+      </div>
+    </div>
+    <div class="grid-cell">
+      面積
+      <div>
+        <select id="orderBy">
+          <option value="" selected>排序</option>
+          <option value="asc">小到大</option>
+          <option value="desc">大到小</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-cell">
+      人口密度
+      <div>
+        <select id="orderBy">
+          <option value="" selected>篩選</option>
+          <option value="&gt;">&gt;</option>
+          <option value="&gt;=">&gt;=</option>
+          <option value="=">=</option>
+          <option value="&lt;=">&lt;=</option>
+          <option value="&lt;">&lt;</option>
+        </select>
+        <input
+          type="number"
+          id="filterPopulation"
+          placeholder="number"
+          style="width: 75px"
+        />
+      </div>
+    </div>
   </div>
   <div class="grid-row">
-    <div class="grid-cell">{{statistic_yyy}}</div>
     <div class="grid-cell">{{site_id}}</div>
     <div class="grid-cell">{{area}}</div>
     <div class="grid-cell">{{population_density}}</div>
