@@ -1,4 +1,4 @@
-import { from } from 'rxjs';
+import { from, of, switchMap } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 function request(method, url) {
@@ -44,20 +44,28 @@ function renderGrid(data: any) {
   }
   contentElement.innerHTML = contentTemplate;
 }
+function getData() {
+  var data = null;
+  return of(data).pipe(
+    switchMap((d) =>
+      !!d
+        ? of(d)
+        : request(
+            'get',
+            'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
+          )
+    )
+  );
+}
 
-/*
-request(
-  'get',
-  'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
-).subscribe(renderGrid);
-*/
+getData().subscribe(renderGrid);
 
 function orderByAreaChanged(event) {
   request(
     'get',
     'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
   )
-    .pipe(map((data) => data.sort((m) => m.area)))
+    //.pipe(map((data) => data.sort((m) => m.area)))
     .subscribe(renderGrid);
 }
 
