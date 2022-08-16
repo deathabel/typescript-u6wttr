@@ -1,7 +1,28 @@
-import { from, of, switchMap } from 'rxjs';
-import { map } from 'rxjs/operators';
+import {
+  distinctUntilChanged,
+  filter,
+  from,
+  Observable,
+  of,
+  Subject,
+  switchMap,
+} from 'rxjs';
+import { map, debounceTime } from 'rxjs/operators';
 
-function request(method, url) {
+type dataType = {
+  site_id: string;
+  area: string;
+  population_density: string;
+};
+
+type conditionType = {
+  keyword?: string;
+  orderSeq?: number;
+  operator?: string;
+  oprand?: string;
+} | null;
+
+function request(method, url): Observable<any> {
   return from(
     new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -26,14 +47,14 @@ function request(method, url) {
     })
   );
 }
-
-function renderGrid(data: any) {
+var contentHtmlTemplate: string;
+function renderGrid(data: dataType[]) {
   const gridElement = document.querySelector('.grid');
   const contentElement = gridElement.querySelector('.grid-row');
-  let contentHtml = contentElement.innerHTML;
+  if (!contentHtmlTemplate) contentHtmlTemplate = contentElement.innerHTML;
   let contentTemplate = '';
   for (let i = 0; i < data.length; i++) {
-    let templateHtml = contentHtml;
+    let templateHtml = contentHtmlTemplate;
     for (const col in data[i]) {
       templateHtml = templateHtml.replace(
         new RegExp(`\\{\\{${col}\\}\\}`, 'g'),
@@ -44,33 +65,77 @@ function renderGrid(data: any) {
   }
   contentElement.innerHTML = contentTemplate;
 }
-function getData() {
-  var data = null;
-  return of(data).pipe(
-    switchMap((d) =>
-      !!d
-        ? of(d)
-        : request(
-            'get',
-            'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
-          )
-    )
-  );
-}
-
-getData().subscribe(renderGrid);
-
-function orderByAreaChanged(event) {
-  request(
+function getData(): Observable<dataType[]> {
+  return request(
     'get',
     'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
-  )
-    //.pipe(map((data) => data.sort((m) => m.area)))
-    .subscribe(renderGrid);
+  );
 }
+function filterSize(operator: string) {
+  return function (a, b): boolean {
+    switch (operator) {
+      case '>=':
+        return a >= b;
+      case '>':
+        return a > b;
+      case '=':
+        return a === b;
+      case '<=':
+        return a <= b;
+      case '<':
+        return a < b;
+      default:
+        return true;
+    }
+  };
+}
+function filterAndSortData(
+  condition: conditionType
+): (data: dataType[]) => dataType[] {
+  const filterFn = (item: dataType) =>
+    (!condition?.keyword || item.site_id.includes(condition.keyword)) &&
+    filterSize(condition?.operator)(item.population_density, condition?.oprand);
+  return (data) =>
+    data
+      .filter(filterFn)
+      .sort((prev, next) =>
+        !!condition?.orderSeq
+          ? prev.area >= next.area
+            ? condition.orderSeq
+            : condition.orderSeq * -1
+          : 0
+      );
+}
+let gridSubject = new Subject<conditionType>();
+let grid$ = gridSubject.pipe(
+  debounceTime(300),
+  distinctUntilChanged(),
+  switchMap((condition) => getData().pipe(map(filterAndSortData(condition))))
+);
 
+grid$.subscribe(renderGrid);
+gridSubject.next(null);
+
+function orderByAreaChanged(event) {
+  const orderSeq = this.value === 'asc' ? 1 : -1;
+  // getData()
+  //   .pipe(
+  //     filter((data) => this.value !== ''),
+  //     map((data: any) =>
+  //       data.sort((prev, next) =>
+  //         prev.area >= next.area ? orderSeq : orderSeq * -1
+  //       )
+  //     )
+  //   )
+  //   .subscribe(renderGrid);
+  gridSubject.next({ orderSeq });
+}
+/*
+ * 1. 當使用者將Keyword都輸入完畢後才進行查詢 ex. keyup過300ms才觸發搜尋
+ * 2. 當輸入值與前次值相同時不重複搜尋
+ */
 function siteSearchInputChanged(event) {
-  console.log(this.value);
+  gridSubject.next({ keyword: this.value });
 }
 
 function filterPopulationSelectChanged(event) {
