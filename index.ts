@@ -12,7 +12,7 @@ import { map, debounceTime, tap } from 'rxjs/operators';
 
 type dataType = {
   site_id: string;
-  area: string;
+  area: number;
   population_density: number;
 };
 
@@ -70,6 +70,14 @@ function getData(): Observable<dataType[]> {
   return request(
     'get',
     'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
+  ).pipe(
+    map((data: dataType[]) => {
+      for (let item of data) {
+        item.area = parseFloat(item.area.toString());
+        item.population_density = parseInt(item.population_density.toString());
+      }
+      return data;
+    })
   );
 }
 function filterSize(operator: string) {
