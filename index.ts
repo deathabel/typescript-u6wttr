@@ -124,7 +124,6 @@ function filterAndSortData(
 let gridSubject = new BehaviorSubject<conditionType>({});
 let grid$ = gridSubject.pipe(
   debounceTime(300),
-  tap(console.log),
   switchMap((condition) => getData().pipe(map(filterAndSortData(condition))))
 );
 
@@ -153,7 +152,9 @@ function orderByAreaChanged(event) {
  * 2. 當輸入值與前次值相同時不重複搜尋
  */
 function siteSearchInputChanged(event) {
-  gridSubject.next({ keyword: this.value });
+  const command = gridSubject?.value;
+  command.keyword = this.value;
+  gridSubject.next(command);
 }
 
 function filterPopulationSelectChanged(event) {
