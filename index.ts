@@ -12,7 +12,7 @@ import { map, debounceTime, tap } from 'rxjs/operators';
 
 type dataType = {
   site_id: string;
-  area: string;
+  area: number;
   population_density: number;
 };
 
@@ -70,6 +70,14 @@ function getData(): Observable<dataType[]> {
   return request(
     'get',
     'https://raw.githubusercontent.com/deathabel/typescript-u6wttr/RxjsDemo/data.json'
+  ).pipe(
+    map((data: dataType[]) => {
+      for (let item of data) {
+        item.area = parseFloat(item.area.toString());
+        item.population_density = parseInt(item.population_density.toString());
+      }
+      return data;
+    })
   );
 }
 function filterSize(operator: string) {
@@ -133,25 +141,26 @@ grid$.subscribe(renderGrid);
 // behavior subject
 // console.log(gridSubject.value)
 
+function gridFilterChanged(fn: (element: any, cmd: conditionType) => void) {
+  return (event: any) => {
+    // reference object 特性
+    fn.call(event.target, event.target, gridSubject?.value);
+    gridSubject.next(gridSubject?.value);
+  };
+}
+
 function orderByAreaChanged(event) {
   const orderSeq = this.value === 'asc' ? 1 : -1;
-  // getData()
-  //   .pipe(
-  //     filter((data) => this.value !== ''),
-  //     map((data: any) =>
-  //       data.sort((prev, next) =>
-  //         prev.area >= next.area ? orderSeq : orderSeq * -1
-  //       )
-  //     )
-  //   )
-  //   .subscribe(renderGrid);
-  gridSubject.next({ orderSeq });
+  const command = gridSubject?.value;
+  command.orderSeq = orderSeq;
+  gridSubject.next(command);
 }
 /*
  * 1. 當使用者將Keyword都輸入完畢後才進行查詢 ex. keyup過300ms才觸發搜尋
  * 2. 當輸入值與前次值相同時不重複搜尋
  */
 function siteSearchInputChanged(event) {
+  console.log(this);
   const command = gridSubject?.value;
   command.keyword = this.value;
   gridSubject.next(command);
@@ -173,17 +182,19 @@ function filterPopulationInputChanged(event) {
 
 (document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
   'keyup',
-  siteSearchInputChanged
+  gridFilterChanged((element, command) => (command.keyword = element.value))
 );
-(document.querySelector('#orderBy') as HTMLInputElement).addEventListener(
+(document.querySelector('#orderBy') as HTMLSelectElement).addEventListener(
   'change',
-  orderByAreaChanged
+  gridFilterChanged(
+    (element, command) => (command.orderSeq = element.value === 'asc' ? 1 : -1)
+  )
 );
-(document.querySelector('#filter') as HTMLInputElement).addEventListener(
+(document.querySelector('#filter') as HTMLSelectElement).addEventListener(
   'change',
-  filterPopulationSelectChanged
+  gridFilterChanged((element, command) => (command.operator = element.value))
 );
 (document.querySelector('#filterInput') as HTMLInputElement).addEventListener(
   'keyup',
-  filterPopulationInputChanged
+  gridFilterChanged((element, command) => (command.operand = element.value))
 );
