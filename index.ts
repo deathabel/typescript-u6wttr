@@ -16,14 +16,6 @@ type dataType = {
   population_density: number;
 };
 
-type conditionType = {
-  property?: string;
-  keyword?: string;
-  orderSeq?: number;
-  operator?: string;
-  operand?: number;
-} | null;
-
 function request(method, url): Observable<any> {
   return from(
     new Promise(function (resolve, reject) {
@@ -89,11 +81,24 @@ function filterSize(operator: string) {
  * Just use for test case
  * Using innerHTML without check script had xss issue, avoid to use
  */
+
+type conditionType = {
+  property?: string;
+  keyword?: string;
+  orderSeq?: number;
+  operator?: string;
+  operand?: number;
+} | null;
+
 class Grid<T extends { [key: string]: any }> {
   private contentElement: HTMLElement;
   private contentHtmlTemplate: string;
-  private filterSubject = new BehaviorSubject<conditionType>({});
-  private filterConditionChanged$: Observable<conditionType>;
+  private filterSubject = new BehaviorSubject<{
+    [property: string]: conditionType;
+  }>({});
+  private filterConditionChanged$: Observable<{
+    [property: string]: conditionType;
+  }>;
   private dataSubject = new BehaviorSubject<T[]>([]);
   dataChanged$: Observable<T[]>;
 
@@ -125,7 +130,57 @@ class Grid<T extends { [key: string]: any }> {
     for (let titleElement of this.gridElement
       .querySelector('.grid-title')
       .querySelectorAll('[g-property]')) {
-      titleElement.innerHTML += this.getToolHtmlTemplate('Keyword');
+      const property = titleElement.getAttribute('g-property');
+      const tools = titleElement.getAttribute('g-tools');
+      // render html
+      titleElement.innerHTML += tools
+        .split(/,/g)
+        .map(this.getToolHtmlTemplate)
+        .join('');
+      // keyword event
+      titleElement
+        .querySelector('[g-tool-keyword]')
+        ?.querySelector('input')
+        ?.addEventListener(
+          'keyup',
+          this.filterFn(
+            property,
+            (element, command) => (command.keyword = element.value)
+          )
+        );
+      // sort event
+      titleElement
+        .querySelector('[g-tool-sort]')
+        ?.querySelector('select')
+        ?.addEventListener(
+          'change',
+          this.filterFn(
+            property,
+            (element, command) =>
+              (command.orderSeq = element.value === 'asc' ? 1 : -1)
+          )
+        );
+      // filter event
+      titleElement
+        .querySelector('[g-tool-filter]')
+        ?.querySelector('select')
+        ?.addEventListener(
+          'change',
+          this.filterFn(
+            property,
+            (element, command) => (command.operator = element.value)
+          )
+        );
+      titleElement
+        .querySelector('[g-tool-filter]')
+        ?.querySelector('input')
+        ?.addEventListener(
+          'keyup',
+          this.filterFn(
+            property,
+            (element, command) => (command.operand = element.value)
+          )
+        );
     }
   }
 
@@ -134,7 +189,21 @@ class Grid<T extends { [key: string]: any }> {
   }
 
   filter(condition: conditionType): void {
-    this.filterSubject.next(condition);
+    if (!condition?.property) return;
+    this.filterSubject.value[condition.property] = condition;
+    this.filterSubject.next(this.filterSubject.value);
+  }
+
+  private filterFn(
+    property: string,
+    fn: (element: any, cmd: conditionType) => void
+  ) {
+    return (event: any) => {
+      const condition = this.filterSubject.value[property] || { property };
+      // reference object 特性
+      fn.call(event.target, event.target, condition);
+      this.filter.call(this, condition);
+    };
   }
 
   private renderGrid(data: T[]): void {
@@ -152,9 +221,25 @@ class Grid<T extends { [key: string]: any }> {
     this.contentElement.innerHTML = contentTemplate;
   }
 
-  private filterAndSortData(condition: conditionType): (data: T[]) => T[] {
+  private filterAndSortData(propertyCondition: {
+    [property: string]: conditionType;
+  }): (data: T[]) => T[] {
     // data filter function
     const filterFn = (item: T) => {
+      let result = true;
+      for (const prop in item) {
+        const condition = propertyCondition[prop];
+        if (!condition) continue;
+        if (
+          !!condition?.keyword &&
+          !item[prop]?.toString()?.includes(condition.keyword)
+        )
+          return false;
+        if (filterSize(condition?.operator)) return false;
+      }
+
+      if (!condition?.property || !item[condition.property]) return true;
+      console.log(item[condition.property], condition);
       return (
         (!condition?.keyword ||
           item[condition.property].includes(condition.keyword)) &&
@@ -180,7 +265,7 @@ class Grid<T extends { [key: string]: any }> {
 /**
  * Try
  */
-globalThis.grid = new Grid(document.querySelector('.grid'), getData);
+const grid = new Grid(document.querySelector('.grid'), getData);
 
 // 使用 currying 技巧，將filter和Sort條件先設定好，後續交由其他程序執行
 
@@ -191,35 +276,3 @@ globalThis.grid = new Grid(document.querySelector('.grid'), getData);
 // gridSubject.next(null);
 // behavior subject
 // console.log(gridSubject.value)
-
-function filterGrid(fn: (element: any, cmd: conditionType) => void) {
-  return (event: any) => {
-    // reference object 特性
-    fn.call(event.target, event.target, gridSubject?.value);
-    gridSubject.next(gridSubject?.value);
-  };
-}
-
-// (document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
-//   'keyup',
-//   filterGrid((element, command) => {
-//     command.property = element.getAttribute('g-property')
-//     console.log(element.getAttribute('g-property'))
-//     command.keyword = element.value;
-//   })
-// );
-// (document.querySelector('#orderBy') as HTMLSelectElement).addEventListener(
-//   'change',
-//   filterGrid((element, command) => {
-//     command.property = element.getAttribute('g-property')
-//     command.orderSeq = element.value === 'asc' ? 1 : -1
-//   })
-// );
-// (document.querySelector('#filter') as HTMLSelectElement).addEventListener(
-//   'change',
-//   filterGrid((element, command) => (command.operator = element.value))
-// );
-// (document.querySelector('#filterInput') as HTMLInputElement).addEventListener(
-//   'keyup',
-//   filterGrid((element, command) => (command.operand = element.value))
-// );
