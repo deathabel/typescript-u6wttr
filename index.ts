@@ -17,6 +17,7 @@ type dataType = {
 };
 
 type conditionType = {
+  property?: string;
   keyword?: string;
   orderSeq?: number;
   operator?: string;
@@ -48,24 +49,7 @@ function request(method, url): Observable<any> {
     })
   );
 }
-var contentHtmlTemplate: string;
-function renderGrid(data: dataType[]) {
-  const gridElement = document.querySelector('.grid');
-  const contentElement = gridElement.querySelector('.grid-row');
-  if (!contentHtmlTemplate) contentHtmlTemplate = contentElement.innerHTML;
-  let contentTemplate = '';
-  for (let i = 0; i < data.length; i++) {
-    let templateHtml = contentHtmlTemplate;
-    for (const col in data[i]) {
-      templateHtml = templateHtml.replace(
-        new RegExp(`\\{\\{${col}\\}\\}`, 'g'),
-        data[i][col]
-      );
-    }
-    contentTemplate += templateHtml;
-  }
-  contentElement.innerHTML = contentTemplate;
-}
+
 function getData(): Observable<dataType[]> {
   return request(
     'get',
@@ -82,9 +66,6 @@ function getData(): Observable<dataType[]> {
 }
 function filterSize(operator: string) {
   return function (a, b): boolean {
-    a = parseInt(a);
-    b = parseInt(b);
-    if (a === NaN || b === NaN) return false;
     switch (operator) {
       case '>=':
         return a >= b;
@@ -101,47 +82,117 @@ function filterSize(operator: string) {
     }
   };
 }
+
+/**
+ * Grid
+ * *** Warning ***
+ * Just use for test case
+ * Using innerHTML without check script had xss issue, avoid to use
+ */
+class Grid<T extends { [key: string]: any }> {
+  private contentElement: HTMLElement;
+  private contentHtmlTemplate: string;
+  private filterSubject = new BehaviorSubject<conditionType>({});
+  private filterConditionChanged$: Observable<conditionType>;
+  private dataSubject = new BehaviorSubject<T[]>([]);
+  dataChanged$: Observable<T[]>;
+
+  constructor(
+    private gridElement: HTMLElement,
+    private readData: () => Observable<T[]>
+  ) {
+    this.contentElement = this.gridElement.querySelector('.grid-row');
+    this.contentHtmlTemplate = this.contentElement.innerHTML;
+    this.initGrid();
+    // filter observable
+    this.filterConditionChanged$ = this.filterSubject.pipe(debounceTime(300));
+    // data observable
+    this.dataChanged$ = this.dataSubject.pipe(
+      switchMap(readData),
+      switchMap((data) =>
+        this.filterConditionChanged$.pipe(
+          map((condition) => this.filterAndSortData(condition)(data))
+        )
+      )
+    );
+    // subscribe
+    this.dataChanged$.subscribe(this.renderGrid.bind(this));
+  }
+  protected getToolHtmlTemplate(type: 'Keyword' | 'sort' | 'filter'): string {
+    return document.querySelector(`#${type}Template`)?.innerHTML;
+  }
+  protected initGrid() {
+    for (let titleElement of this.gridElement
+      .querySelector('.grid-title')
+      .querySelectorAll('[g-property]')) {
+      titleElement.innerHTML += this.getToolHtmlTemplate('Keyword');
+    }
+  }
+
+  search(): void {
+    this.dataSubject.next([]);
+  }
+
+  filter(condition: conditionType): void {
+    this.filterSubject.next(condition);
+  }
+
+  private renderGrid(data: T[]): void {
+    let contentTemplate = '';
+    for (let i = 0; i < data.length; i++) {
+      let templateHtml = this.contentHtmlTemplate;
+      for (const col in data[i]) {
+        templateHtml = templateHtml.replace(
+          new RegExp(`\\{\\{${col}\\}\\}`, 'g'),
+          data[i][col]
+        );
+      }
+      contentTemplate += templateHtml;
+    }
+    this.contentElement.innerHTML = contentTemplate;
+  }
+
+  private filterAndSortData(condition: conditionType): (data: T[]) => T[] {
+    // data filter function
+    const filterFn = (item: T) => {
+      return (
+        (!condition?.keyword ||
+          item[condition.property].includes(condition.keyword)) &&
+        filterSize(condition?.operator)(
+          item[condition.property],
+          condition?.operand
+        )
+      );
+    };
+    return (data) =>
+      data
+        .filter(filterFn)
+        .sort((prev, next) =>
+          !!condition?.orderSeq
+            ? prev[condition.property] >= next[condition.property]
+              ? condition.orderSeq
+              : condition.orderSeq * -1
+            : 0
+        );
+  }
+}
+
 /**
  * Try
  */
+globalThis.grid = new Grid(document.querySelector('.grid'), getData);
 
 // 使用 currying 技巧，將filter和Sort條件先設定好，後續交由其他程序執行
-function filterAndSortData(
-  condition: conditionType
-): (data: dataType[]) => dataType[] {
-  // data filter function
-  const filterFn = (item: dataType) =>
-    (!condition?.keyword || item.site_id.includes(condition.keyword)) &&
-    filterSize(condition?.operator)(
-      item.population_density,
-      condition?.operand
-    );
-  // return function
-  return (data) =>
-    data
-      .filter(filterFn)
-      .sort((prev, next) =>
-        !!condition?.orderSeq
-          ? prev.area >= next.area
-            ? condition.orderSeq
-            : condition.orderSeq * -1
-          : 0
-      );
-}
-//let gridSubject = new Subject<conditionType>();
-let gridSubject = new BehaviorSubject<conditionType>({});
-let grid$ = gridSubject.pipe(
-  debounceTime(300),
-  switchMap((condition) => getData().pipe(map(filterAndSortData(condition))))
-);
 
-grid$.subscribe(renderGrid);
+// return function
+
+//let gridSubject = new Subject<conditionType>();
 // normal subject
 // gridSubject.next(null);
 // behavior subject
 // console.log(gridSubject.value)
 
-function gridFilterChanged(fn: (element: any, cmd: conditionType) => void) {
+function filterGrid(fn: (element: any, cmd: conditionType) => void) {
   return (event: any) => {
     // reference object 特性
     fn.call(event.target, event.target, gridSubject?.value);
@@ -149,52 +200,26 @@ function gridFilterChanged(fn: (element: any, cmd: conditionType) => void) {
   };
 }
 
-function orderByAreaChanged(event) {
-  const orderSeq = this.value === 'asc' ? 1 : -1;
-  const command = gridSubject?.value;
-  command.orderSeq = orderSeq;
-  gridSubject.next(command);
-}
-/*
- * 1. 當使用者將Keyword都輸入完畢後才進行查詢 ex. keyup過300ms才觸發搜尋
- * 2. 當輸入值與前次值相同時不重複搜尋
- */
-function siteSearchInputChanged(event) {
-  console.log(this);
-  const command = gridSubject?.value;
-  command.keyword = this.value;
-  gridSubject.next(command);
-}
-
-function filterPopulationSelectChanged(event) {
-  //console.log(this.value);
-  const command = gridSubject?.value;
-  command.operator = this.value;
-  gridSubject.next(command);
-}
-
-function filterPopulationInputChanged(event) {
-  //console.log(this.value);
-  const command = gridSubject.value;
-  command.operand = this.value;
-  gridSubject.next(command);
-}
-
-(document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
-  'keyup',
-  gridFilterChanged((element, command) => (command.keyword = element.value))
-);
-(document.querySelector('#orderBy') as HTMLSelectElement).addEventListener(
-  'change',
-  gridFilterChanged(
-    (element, command) => (command.orderSeq = element.value === 'asc' ? 1 : -1)
-  )
-);
-(document.querySelector('#filter') as HTMLSelectElement).addEventListener(
-  'change',
-  gridFilterChanged((element, command) => (command.operator = element.value))
-);
-(document.querySelector('#filterInput') as HTMLInputElement).addEventListener(
-  'keyup',
-  gridFilterChanged((element, command) => (command.operand = element.value))
-);
+// (document.querySelector('#searchInput') as HTMLInputElement).addEventListener(
+//   'keyup',
+//   filterGrid((element, command) => {
+//     command.property = element.getAttribute('g-property')
+//     console.log(element.getAttribute('g-property'))
+//     command.keyword = element.value;
+//   })
+// );
+// (document.querySelector('#orderBy') as HTMLSelectElement).addEventListener(
+//   'change',
+//   filterGrid((element, command) => {
+//     command.property = element.getAttribute('g-property')
+//     command.orderSeq = element.value === 'asc' ? 1 : -1
+//   })
+// );
+// (document.querySelector('#filter') as HTMLSelectElement).addEventListener(
+//   'change',
+//   filterGrid((element, command) => (command.operator = element.value))
+// );
+// (document.querySelector('#filterInput') as HTMLInputElement).addEventListener(
+//   'keyup',
+//   filterGrid((element, command) => (command.operand = element.value))
+// );
