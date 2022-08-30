@@ -1,10 +1,12 @@
+/** Observer interface */
 interface Observer {
+  /** 實作nofity function，提供Observable呼叫 */
   notify(message: any): void;
 }
-
+/** Observable interface */
 class Observable {
   private observers: Observer[] = [];
-
+  /**  通知所有的觀察者，並提供異動的資料 */
   notifyObservers(message: any): void {
     for (var observer of this.observers)
       new Promise((resolve, reject) => {
@@ -15,15 +17,16 @@ class Observable {
         }
       });
   }
-  subscribe(notify: (message: any) => any): Subscription {
-    return new Subscription(this, this.observers.push({ notify }) - 1);
+  /** 提供Observer訂閱 */
+  subscribe(observer: Observer): Subscription {
+    return new Subscription(this, this.observers.push(observer) - 1);
   }
 
   removeObserver(index: number) {
     this.observers.splice(index, 1);
   }
 }
-
+/** Subscription interface */
 class Subscription {
   constructor(private observable: Observable, private index: number) {
     this.observable = observable;
@@ -112,15 +115,20 @@ let repository = new Repository(document.querySelector('#repository'));
 
 mineral.digging();
 
-mineral.stockChange$.subscribe((stones) => {
-  if (truck.isReady)
-    mineral
-      .stockOut(10)
-      .then((stones) => truck.transport(stones))
-      .then((stones) => repository.stockIn(stones));
+mineral.stockChange$.subscribe({
+  notify: (stones) => {
+    if (truck.isReady)
+      mineral
+        .stockOut(10)
+        .then((stones) => truck.transport(stones))
+        .then((stones) => repository.stockIn(stones));
+  },
 });
 
 let log = document.querySelector('#log');
-mineral.stockChange$.subscribe((message) => {
-  log.innerHTML = `<p>${message.type} ${message.quantity}</p>` + log.innerHTML;
+mineral.stockChange$.subscribe({
+  notify: (message) => {
+    log.innerHTML =
+      `<p>${message.type} ${message.quantity}</p>` + log.innerHTML;
+  },
 });
